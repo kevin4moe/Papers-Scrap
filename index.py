@@ -4,8 +4,22 @@ import pandas as pd
 import time
 import random
 import re
+from tqdm import tqdm
+import logging
+from datetime import datetime
 
-term = "health"
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f'scraper_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+term = "nutrition"
 
 class GoogleScholarScraper:
     def __init__(self):
@@ -18,7 +32,8 @@ class GoogleScholarScraper:
             'http': 'http://your_proxy:port',  # Replace with your proxy
             'https': 'http://your_proxy:port',  # Replace with your proxy
         }
-    
+        self.articles_processed = 0
+        
     def get_random_user_agent(self):
         return random.choice(self.user_agents)
     
@@ -30,7 +45,8 @@ class GoogleScholarScraper:
                 if 1900 <= year <= 2024:
                     return year
             return None
-        except:
+        except Exception as e:
+            logger.error(f"Error extracting year from text: {text}. Error: {str(e)}")
             return None
         
     def parse_author_info(self, text):
@@ -45,26 +61,24 @@ class GoogleScholarScraper:
                     break
             return authors, year
         except Exception as e:
-            print(f"Error parsing author info: {str(e)}")
+            logger.error(f"Error parsing author info: {str(e)}")
             return '', None
         
-    def scrape_page(self, url):
+    def scrape_page(self, url, pbar):
         try:
-            time.sleep(random.uniform(5, 10))  # Increased delay
-            headers = {
-                'User-Agent': self.get_random_user_agent()
-            }
+            delay = random.uniform(5, 10)
+            logger.info(f"Waiting {delay:.2f} seconds before next request")
+            time.sleep(delay)
+            
+            headers = {'User-Agent': self.get_random_user_agent()}
             response = requests.get(url, headers=headers)#, proxies=self.proxies)
             response.raise_for_status()
-            
-            # Debug: Print the full response
-            # print(response.text)  # Check for CAPTCHA or blocking
             
             soup = BeautifulSoup(response.text, 'html.parser')
             articles = soup.find_all('div', class_='gs_r gs_or gs_scl')
             
             results = []
-            for article in articles:
+            for article in tqdm(articles, desc="Processing articles", leave=False):
                 try:
                     title_element = article.find('h3', class_='gs_rt')
                     title = title_element.get_text() if title_element else 'No Title'
@@ -74,7 +88,7 @@ class GoogleScholarScraper:
                     authors, year = '', None
                     if authors_element:
                         authors_text = authors_element.get_text()
-                        print(f"Authors text: {authors_text}")  # Debug statement
+                        logger.debug(f"Processing authors text: {authors_text}")
                         authors, year = self.parse_author_info(authors_text)
                     
                     description_element = article.find('div', class_='gs_rs')
@@ -95,44 +109,56 @@ class GoogleScholarScraper:
                         'url': url,
                         'citations': citations
                     })
+                    
+                    self.articles_processed += 1
+                    pbar.update(1)
+                    
                 except Exception as e:
-                    print(f"Error processing article: {str(e)}")
+                    logger.error(f"Error processing article: {str(e)}")
                     continue
             
             return results
             
         except Exception as e:
-            print(f"Error scraping page: {str(e)}")
+            logger.error(f"Error scraping page: {str(e)}")
             return []
     
-    def scrape_multiple_pages(self, base_url, num_articles=10):  # Start with a smaller number
+    def scrape_multiple_pages(self, base_url, num_articles=10):
         all_results = []
         num_pages = (num_articles + 9) // 10
         
-        for page in range(num_pages):
-            start = page * 10
-            url = f"{base_url}&start={start}"
-            
-            print(f"Scraping page {page + 1}/{num_pages} ({len(all_results)} articles collected)...")
-            results = self.scrape_page(url)
-            all_results.extend(results)
-            
-            if not results or len(all_results) >= num_articles:
-                break
-            
-            time.sleep(random.uniform(5, 10))  # Increased delay
+        logger.info(f"Starting scraping of {num_articles} articles across {num_pages} pages")
+        
+        with tqdm(total=num_articles, desc="Total Progress", unit="article") as pbar:
+            for page in range(num_pages):
+                start = page * 10
+                url = f"{base_url}&start={start}"
+                
+                logger.info(f"Scraping page {page + 1}/{num_pages}")
+                results = self.scrape_page(url, pbar)
+                all_results.extend(results)
+                
+                if not results or len(all_results) >= num_articles:
+                    break
+                
+                delay = random.uniform(5, 10)
+                logger.info(f"Waiting {delay:.2f} seconds before next page")
+                time.sleep(delay)
         
         all_results = all_results[:num_articles]
+        logger.info(f"Completed scraping. Total articles collected: {len(all_results)}")
         return pd.DataFrame(all_results)
 
 def main():
+    logger.info(f"Starting Google Scholar scraping for term: {term}")
+    
     scraper = GoogleScholarScraper()
     base_url = f"https://scholar.google.com/scholar?q={term}&hl=en&as_sdt=0,5&as_ylo=2018&as_yhi=2025"
     
-    df = scraper.scrape_multiple_pages(base_url, num_articles=400)  # Start with a smaller number
+    df = scraper.scrape_multiple_pages(base_url, num_articles=400)
     
     if df.empty:
-        print("No results found!")
+        logger.error("No results found!")
         return
     
     try:
@@ -144,22 +170,23 @@ def main():
         
         output_filename = f'{term}_google_scholar_results.csv'
         df.to_csv(output_filename, index=False)
-        print(f"\nScraped {len(df)} articles and saved to {output_filename}")
+        logger.info(f"Scraped {len(df)} articles and saved to {output_filename}")
         
-        print("\nYear distribution:")
+        logger.info("Year distribution:")
         year_counts = df['year'].value_counts().sort_index()
         if not year_counts.empty:
-            print(year_counts)
+            logger.info("\n" + str(year_counts))
         else:
-            print("No valid years found in the data")
+            logger.warning("No valid years found in the data")
         
-        print("\nFirst few results:")
-        print(df[['title', 'year', 'citations']].head())
+        logger.info("First few results:")
+        logger.info("\n" + str(df[['title', 'year', 'citations']].head()))
         
     except Exception as e:
-        print(f"Error processing results: {str(e)}")
-        df.to_csv(f'{term}_google_scholar_results_raw.csv', index=False)
-        print("Saved raw results to backup file")
+        logger.error(f"Error processing results: {str(e)}")
+        backup_filename = f'{term}_google_scholar_results_raw.csv'
+        df.to_csv(backup_filename, index=False)
+        logger.info(f"Saved raw results to backup file: {backup_filename}")
 
 if __name__ == "__main__":
     main()
