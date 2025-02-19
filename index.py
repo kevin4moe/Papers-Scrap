@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-term = "nutrition"
+term = "biology"
 
 class GoogleScholarScraper:
     def __init__(self):
@@ -67,7 +67,7 @@ class GoogleScholarScraper:
     def scrape_page(self, url, pbar):
         try:
             delay = random.uniform(5, 10)
-            logger.info(f"Waiting {delay:.2f} seconds before next request")
+            tqdm.write(f"Waiting {delay:.2f} seconds before next request")
             time.sleep(delay)
             
             headers = {'User-Agent': self.get_random_user_agent()}
@@ -78,7 +78,8 @@ class GoogleScholarScraper:
             articles = soup.find_all('div', class_='gs_r gs_or gs_scl')
             
             results = []
-            for article in tqdm(articles, desc="Processing articles", leave=False):
+            # Remove nested progress bar for articles
+            for article in articles:
                 try:
                     title_element = article.find('h3', class_='gs_rt')
                     title = title_element.get_text() if title_element else 'No Title'
@@ -94,12 +95,23 @@ class GoogleScholarScraper:
                     description_element = article.find('div', class_='gs_rs')
                     description = description_element.get_text() if description_element else ''
                     
-                    cite_element = article.find('div', class_='gs_fl')
+                    # Look for the citations div
+                    cite_element = article.find('div', class_='gs_fl gs_flb')
                     citations = 0
+
                     if cite_element:
-                        cite_text = cite_element.find(text=lambda t: t and 'Cited by' in t)
-                        if cite_text:
-                            citations = int(''.join(filter(str.isdigit, cite_text)))
+                        # Look for "Cited by" link (text-based OR href-based)
+                        cite_link = cite_element.find('a', text=lambda t: t and 'Cited by' in t) or \
+                                    cite_element.find('a', href=lambda x: x and 'cites=' in x)
+
+                        if cite_link:
+                            citations = int(''.join(filter(str.isdigit, cite_link.get_text())))
+                        else:
+                            # Fall back: Iterate over all links to find "Cited by"
+                            for link in cite_element.find_all('a'):
+                                if 'Cited by' in link.get_text():
+                                    citations = int(''.join(filter(str.isdigit, link.get_text())))
+                                    break  # No need to continue once we find it
                     
                     results.append({
                         'title': title,
@@ -129,12 +141,13 @@ class GoogleScholarScraper:
         
         logger.info(f"Starting scraping of {num_articles} articles across {num_pages} pages")
         
-        with tqdm(total=num_articles, desc="Total Progress", unit="article") as pbar:
+        with tqdm(total=num_articles, desc="Total Progress", unit="article", dynamic_ncols=True, position=0, leave=True) as pbar:
             for page in range(num_pages):
                 start = page * 10
                 url = f"{base_url}&start={start}"
                 
-                logger.info(f"Scraping page {page + 1}/{num_pages}")
+                # Update progress description
+                pbar.set_description(f"Page {page + 1}/{num_pages}")
                 results = self.scrape_page(url, pbar)
                 all_results.extend(results)
                 
@@ -142,7 +155,8 @@ class GoogleScholarScraper:
                     break
                 
                 delay = random.uniform(5, 10)
-                logger.info(f"Waiting {delay:.2f} seconds before next page")
+                # Use tqdm.write for logging to avoid interference with progress bar
+                tqdm.write(f"Waiting {delay:.2f} seconds before next page")
                 time.sleep(delay)
         
         all_results = all_results[:num_articles]
@@ -155,7 +169,7 @@ def main():
     scraper = GoogleScholarScraper()
     base_url = f"https://scholar.google.com/scholar?q={term}&hl=en&as_sdt=0,5&as_ylo=2018&as_yhi=2025"
     
-    df = scraper.scrape_multiple_pages(base_url, num_articles=400)
+    df = scraper.scrape_multiple_pages(base_url, num_articles=200)
     
     if df.empty:
         logger.error("No results found!")
