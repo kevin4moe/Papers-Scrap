@@ -158,6 +158,7 @@ dependencies:
   - pysocks=1.7.1=py312h06a4308_0
   - python=3.12.2=hab00c5b_0_cpython
   - python-dateutil=2.9.0post0=py312h06a4308_2
+  - python-dotenv=1.0.1=pyhd8ed1ab_1
   - python-fastjsonschema=2.20.0=py312h06a4308_0
   - python-json-logger=3.2.1=py312h06a4308_0
   - python-tzdata=2023.3=pyhd3eb1b0_0

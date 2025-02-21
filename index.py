@@ -7,6 +7,11 @@ import re
 from tqdm import tqdm
 import logging
 from datetime import datetime
+from dotenv import load_dotenv
+from os import getenv
+
+load_dotenv(".env", override=True)
+term = getenv("SEARCH_DB_TERM")
 
 # Set up logging
 logging.basicConfig(
@@ -18,8 +23,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-term = "biology"
 
 class GoogleScholarScraper:
     def __init__(self):
