@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(f'scraper_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'),
+        logging.FileHandler(f'/log/scraper_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'),
         logging.StreamHandler()
     ]
 )
@@ -185,7 +185,7 @@ def main():
         if not df['year'].isna().all():
             df = df.sort_values(['year', 'citations'], ascending=[False, False], na_position='last')
         
-        output_filename = f'{term}_google_scholar_results.csv'
+        output_filename = f'/data/{term.lower().replace(' ', '_')}_google_scholar.csv'
         df.to_csv(output_filename, index=False)
         logger.info(f"Scraped {len(df)} articles and saved to {output_filename}")
         
@@ -201,7 +201,7 @@ def main():
         
     except Exception as e:
         logger.error(f"Error processing results: {str(e)}")
-        backup_filename = f'{term}_google_scholar_results_raw.csv'
+        backup_filename = f'/data/{term.lower().replace(' ', '_')}_google_scholar_raw.csv'
         df.to_csv(backup_filename, index=False)
         logger.info(f"Saved raw results to backup file: {backup_filename}")
 
