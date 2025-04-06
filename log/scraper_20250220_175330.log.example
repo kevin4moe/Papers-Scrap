@@ -1,0 +1,23 @@
+2025-02-20 17:53:30,182 - INFO - Starting Google Scholar scraping for term: finance
+2025-02-20 17:53:30,182 - INFO - Starting scraping of 200 articles across 20 pages
+2025-02-20 17:58:40,059 - INFO - Completed scraping. Total articles collected: 200
+2025-02-20 17:58:40,074 - INFO - Scraped 200 articles and saved to finance_google_scholar_results.csv
+2025-02-20 17:58:40,075 - INFO - Year distribution:
+2025-02-20 17:58:40,077 - INFO - 
+year
+2018.0    35
+2019.0    32
+2020.0    35
+2021.0    30
+2022.0    33
+2023.0    25
+2024.0     9
+Name: count, dtype: int64
+2025-02-20 17:58:40,077 - INFO - First few results:
+2025-02-20 17:58:40,081 - INFO - 
+                                                 title    year  citations
+65                  The finance uncertainty multiplier  2024.0        407
+42           [BOOK][B] The finance of local government  2024.0        176
+120  [BOOK][B] Mathematics for economics and financ...  2024.0         95
+24      The technology of decentralized finance (DeFi)  2024.0         91
+131                         [BOOK][B] Personal finance  2024.0         36
