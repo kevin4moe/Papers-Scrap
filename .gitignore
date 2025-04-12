@@ -1,8 +1,6 @@
-/data
 /html
 /pdf
 
-*.csv
 *.log
 
 .env
